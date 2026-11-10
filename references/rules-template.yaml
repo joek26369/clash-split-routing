@@ -1,0 +1,171 @@
+# Clash Verge 规则增强模板（rules）
+# 放置位置：Clash Verge → 配置 → 当前订阅 → 右键「编辑规则」
+# 落盘文件：profiles/<uid>.yaml
+#
+# 三向分流的骨架：
+#   国内        → DIRECT
+#   AI / 账号域 → AI-RESIDENTIAL（单个住宅节点，成员唯一，失效即断）
+#   其余国外    → RELAY（机房中转）
+#
+# 组名占位说明（按你的实际组名替换）：
+#   AI-RESIDENTIAL  仅含住宅节点的 select 组
+#   RELAY           机房中转出口
+#   DIRECT          直连
+#
+# ⚠️ 关键：prepend 位于订阅规则之前，append 位于末尾。
+#    MATCH 必须放 append，放 prepend 会让后面所有订阅规则失效。
+
+prepend:
+  # ── 第 0 优先级：防回环 ───────────────────────────────────────────
+  # 若你的中转是本地 TUN 客户端（sing-box / mihomo 本地实例），它的出站必须直连，
+  # 否则会形成 [本地客户端] → TUN → 规则 → [本地客户端] 的死循环，CPU 打满且不通。
+  # 进程名按实际二进制名替换。
+  - PROCESS-NAME,sing-box,DIRECT
+
+  # ── 探针域名：钉到住宅支路，供面板/脚本实测「AI 出口真实 IP」──
+  # 不加这条，探针会掉到 MATCH 走机房，面板显示的 AI 出口是假的。
+  - DOMAIN,api.ipify.org,AI-RESIDENTIAL
+
+  # ── 自建/自用的查询面板必须直连 ─────────────────────────────────
+  # Looking Glass 这类面板展示的是「从访客来源到各节点的路径与延迟」。
+  # 经代理访问时，它看到的是代理出口而不是本机真实源，数据完全失去意义。
+  # 用 DOMAIN-SUFFIX 一并覆盖订阅、测速等同族子域。
+  # - DOMAIN-SUFFIX,lg.example.com,DIRECT
+
+  # ── 主体：国外 AI 应用，只走住宅 ─────────────────────────────────
+  # 设计原则：这一组的成员必须是「唯一一个」，不允许自动切换、不允许含 DIRECT。
+  # 原因见 references/pitfalls.md「fail-open」一节：多成员组在节点故障时会静默
+  # 换到另一个 IP，账号侧看到的是同一会话两个出口，风控直接命中。
+  - DOMAIN-SUFFIX,anthropic.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,claude.ai,AI-RESIDENTIAL
+  # claude.com 是独立注册域（官网/落地页/下载），不被 anthropic.com 后缀覆盖。
+  # 漏钉会掉 MATCH 走机房，与 claude.ai 出口不一致。
+  - DOMAIN-SUFFIX,claude.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,claudeusercontent.com,AI-RESIDENTIAL
+
+  # 身份验证外包商（Anthropic 的 Persona 身份核验流程）。
+  # 流程页 inquiry.withpersona.com + API/SDK 子域，未钉会掉 MATCH，
+  # 与主站出口不一致时验证 flow 报 "network issues"。
+  - DOMAIN-SUFFIX,withpersona.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,persona.us,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,persona.id,AI-RESIDENTIAL
+
+  # ── 遥测 / 反欺诈域：必须与主站同出口 ───────────────────────────
+  # 这是整套规则里最容易被忽略、后果最严重的一段。
+  # 只钉 claude.ai、遥测走机场 = 同一账号留下两条 IP 轨迹，
+  # Sift / Turnstile 这类风控会立刻做关联。
+  - DOMAIN-SUFFIX,sentry.io,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,sentry-cdn.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,datadoghq.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,browser-intake-datadoghq.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,siftscience.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,sift.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,segment.io,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,segment.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,statsig.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,featuregates.org,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,amplitude.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,google-analytics.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,googletagmanager.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,cloudflareinsights.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,intercom.io,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,intercomcdn.com,AI-RESIDENTIAL
+
+  # ── 其他 AI 服务 ───────────────────────────────────────────────
+  - DOMAIN-SUFFIX,openai.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,chatgpt.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,oaistatic.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,oaiusercontent.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,openaiusercontent.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,gemini.google.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,generativelanguage.googleapis.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,aistudio.google.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,copilot.microsoft.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,githubcopilot.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,perplexity.ai,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,cursor.sh,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,cursorapi.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,cursor.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,x.ai,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,grok.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,mistral.ai,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,cohere.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,poe.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,huggingface.co,AI-RESIDENTIAL
+
+  # ❌ 反面案例：deepseek.com 不要钉住宅。
+  # 它是国内服务（chat.deepseek.com 解析到华为云 WAF 国内节点，deepseek.com 亦属
+  # geosite:CN）。国内注册的账号从美国住宅 IP 登录 = 异地登录风控；
+  # 且请求绕道美国再回国内（boomerang），延迟翻倍。
+  # 正确做法：让它落到订阅的 GEOSITE,CN,DIRECT。
+
+  # ── Google 账号体系：与住宅出口保持一致 ─────────────────────────
+  # 若登录走 Google OAuth（住宅 IP，弗吉尼亚），而浏览器访问 Google 走共享机房 IP
+  # （加州），同一账号短时间跨 4000km = impossible travel，
+  # 是 Google 判定账号异常最强的信号之一。统一到住宅可消除该风险。
+  - DOMAIN-SUFFIX,accounts.google.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,myaccount.google.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,gstatic.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,googleapis.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,googleusercontent.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,ggpht.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,googleadservices.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,googlesyndication.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,googletagservices.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,google.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,google.co.jp,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,gmail.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,googlemail.com,AI-RESIDENTIAL
+  # googleapis.cn 是个已知隐患：它是 Google 面向国内开发者的域名，
+  # 走住宅会绕远。是否钉住宅取决于你是否使用国内 GCP 项目，按需放开。
+  # - DOMAIN-SUFFIX,googleapis.cn,AI-RESIDENTIAL
+
+  # ── YouTube：视频流量走机房 ────────────────────────────────────
+  # 视频字节（googlevideo / ytimg）通常占 95% 以上流量。全部钉到住宅会迅速烧完
+  # 住宅套餐（常见 140GB/月），而 AI 应用恰恰需要那份额度。
+  # 登录事件仍在 accounts.google.com（住宅），YouTube 会话见机房 IP；
+  # 但两个出口都是美国 IP，不存在跨洲横跳风控。
+  # 代价：YouTube 偶发二次验证概率略升。
+  - DOMAIN-SUFFIX,googlevideo.com,RELAY
+  - DOMAIN-SUFFIX,ytimg.com,RELAY
+  - DOMAIN-SUFFIX,youtube.com,RELAY
+  - DOMAIN-SUFFIX,youtu.be,RELAY
+
+  # ── 按进程兜底：域名清单永远追不上客户端更新 ───────────────────
+  # 出现未覆盖的新域名时，只要进程命中这里，仍锁定住宅。
+  # macOS 上进程名大小写敏感：Claude Code CLI 的实际进程名是小写 claude。
+  - PROCESS-NAME,claude,AI-RESIDENTIAL
+  - PROCESS-NAME,Claude,AI-RESIDENTIAL
+  - PROCESS-NAME,codex,AI-RESIDENTIAL
+  - PROCESS-NAME,Cursor,AI-RESIDENTIAL
+  - PROCESS-NAME,ChatGPT,AI-RESIDENTIAL
+
+  # 按完整路径钉死（当进程名不可靠时用）。
+  # 注意：很多 CLI 的 bin 只是 node 包装脚本，真正发请求的是下面的原生二进制，
+  # 两条都要写。把 /Users/<you> 换成你的实际路径。
+  # - PROCESS-PATH,/Users/<you>/.local/bin/claude,AI-RESIDENTIAL
+  # - PROCESS-PATH,/Users/<you>/.local/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex,AI-RESIDENTIAL
+
+  # ── 出口核对站：走住宅，便于验证与 AI 应用同 IP ────────────────
+  - DOMAIN-SUFFIX,browserleaks.com,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,ipleak.net,AI-RESIDENTIAL
+  - DOMAIN-SUFFIX,dnsleaktest.com,AI-RESIDENTIAL
+
+append:
+  # 兜底：普通国外流量 → 机房中转。
+  # 这里刻意不用「自动选择 / 故障转移」组：那类组在全部节点失效时会回落到
+  # DIRECT，等于把流量直接暴露成国内 IP，比断线更糟。
+  - MATCH,RELAY
+
+delete:
+  # 订阅自带的规则需要显式删除，否则 prepend/append 之外的部分仍然生效。
+  # 典型要删的两类：
+  #   1) 把大流量站点指给多成员组的 GEOSITE（组内含 DIRECT 或自动切换 = fail-open）
+  #   2) 订阅自己的 MATCH —— 它会让你的 append MATCH 永远轮不到
+  #
+  # 按你的订阅实际内容改写，下面是示意：
+  # - GEOSITE,GOOGLE,VPN-GROUP
+  # - GEOSITE,YOUTUBE,VPN-GROUP
+  # - GEOSITE,TELEGRAM,VPN-GROUP
+  # - GEOSITE,NETFLIX,VPN-GROUP
+  # - MATCH,VPN-GROUP

@@ -1,0 +1,41 @@
+# Clash Verge 组增强模板（groups）
+# 放置位置：配置 → 当前订阅 → 右键「编辑代理组」
+# 落盘文件：profiles/<uid>.yaml
+#
+# 这套组结构是为「出口必须可预测」设计的，和常见的机场配置思路不同：
+# 不追求自动选优，追求「我说走哪个出口，就一定只从那个出口出去」。
+
+prepend:
+  # ── AI-RESIDENTIAL：AI 专用住宅出口 ───────────────────────────
+  # 成员必须唯一。
+  # 多成员 + 自动切换 = fail-open：主节点挂了静默换到备用，账号侧看到同一会话
+  # 出现两个出口 IP，风控直接命中，比直接断线糟糕得多。
+  # 必须直连/断线时，用户自己会去修，而不是让系统偷偷换路。
+  - name: "AI-RESIDENTIAL"
+    type: select
+    proxies:
+      - "RESIDENTIAL-NODE"          # ← 换成你的住宅节点实际名称
+
+  # ── GLOBAL：global 模式下 mihomo 使用的默认组 ──────────────────
+  # 必须显式定义。不定义的话 mihomo 会自动生成一个包含全部节点 + DIRECT 的
+  # GLOBAL 组，一旦有人切到 global 模式，流量可能直接从 DIRECT 出去。
+  - name: "GLOBAL"
+    type: select
+    proxies:
+      - "RESIDENTIAL-NODE"          # ← 换成你的住宅节点实际名称
+
+  # ── FALLBACK-OUT：MATCH 兜底出口的开关组 ──────────────────────
+  # 这是「登录/支付模式」的落点：
+  #   默认选中机房中转 → 普通国外流量省住宅配额
+  #   窗口期切到住宅     → SSO IdP、3DS 发卡行等无法预钉的域也全走住宅，
+  #                        保证登录/支付整条链路出口一致
+  # 切换由 scripts/switch-exit.sh 通过 mihomo 运行时 API 完成，零重启、秒生效。
+  - name: "FALLBACK-OUT"
+    type: select
+    proxies:
+      - "RELAY-NODE"                # ← 换成你的机房中转，保持默认选中
+      - "AI-RESIDENTIAL"            # 直接引用上面的组，避免重复维护节点名
+
+append: []
+
+delete: []

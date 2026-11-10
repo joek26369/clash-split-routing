@@ -1,0 +1,8 @@
+.DS_Store
+*.log
+*.new
+config.env
+targets.conf
+exit-tags.json
+state/
+*.app

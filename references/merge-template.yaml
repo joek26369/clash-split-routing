@@ -1,0 +1,43 @@
+# Clash Verge 全局 Merge 模板
+# 放置位置：设置 → 配置目录 → Merge.yaml（对所有订阅生效）
+#
+# 这个文件只做两件事，但两件都是踩过坑才加的。
+
+# ── 1. 固定 mode ─────────────────────────────────────────────────
+# Clash Verge 在重启/切换订阅时会把 mode 重置。实测会被重置成 global，
+# 而 global 模式下 rules 整体作废、GLOBAL 组接管全部流量 ——
+# 表现就是「规则一条没少，但国内站也走代理了」。
+#
+# 这里写死只是第一层保险（启动时刻）。真正的保证需要三层同时固定：
+#   ① 本文件 mode 行
+#   ② 订阅增强 JS 里的 config.mode 行（见 references/pitfalls.md）
+#   ③ 运行时通过 mihomo API PATCH（scripts/switch-exit.sh 负责）
+# 三层缺一层，就会出现「UI 显示已切回 rule、内核其实还是 global」。
+mode: rule
+
+profile:
+  store-selected: true
+
+# ── 2. 域名嗅探：必须打开 override-destination ────────────────────
+# 这是最容易漏、症状最诡异的一项。
+#
+# 订阅默认给的是 false：只嗅探 SNI 用于日志和规则匹配，但不改写发往出站节点的
+# 目标地址。于是当客户端用「裸 IP」发起连接时（Chrome 命中自己的 DNS 缓存是最常见
+# 的情况），出站节点收到的是一个 IP 而不是域名。
+#
+# 很多住宅线路对「IP 型目标」直接拒绝，表现为：
+#   curl https://203.0.113.10  → tlsv1 alert protocol version
+#   curl https://example.com  → 200 OK
+# 同一个站点、同一台机器，域名能开、IP 打不开，极难定位。
+#
+# 打开 override-destination 后，嗅探到的域名会覆盖目标地址，节点始终按域名出站。
+# 开启后可以在内核日志里确认生效：
+#   [Sniffer] replace domain []-->[example.com]
+sniffer:
+  enable: true
+  parse-pure-ip: true
+  force-dns-mapping: true
+  override-destination: true
+  sniffing:
+    - tls
+    - http
