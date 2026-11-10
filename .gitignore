@@ -2,7 +2,16 @@
 *.log
 *.new
 config.env
+*.env
+!config.env.example
+!*.env.example
 targets.conf
 exit-tags.json
 state/
 *.app
+.gateway.json
+node-secrets.env
+*.pem
+*.key
+id_ed25519*
+id_rsa*
